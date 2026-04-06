@@ -1,0 +1,13 @@
+fastapi
+uvicorn 
+python-dotenv 
+requests
+ollama
+groq
+python-jose[cryptography] 
+bcrypt
+python-multipart
+psycopg2-binary 
+sqlalchemy
+alembic
+pydantic[email]
