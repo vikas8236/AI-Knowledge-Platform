@@ -23,7 +23,7 @@ export default function MessageBubble({ message, username }) {
           <p className="whitespace-pre-wrap">{message.content}</p>
         </div>
         <p className="text-[11px] text-slate-500 mt-1 px-1">
-          {message.timestamp.toLocaleTimeString([], {
+          {new Date(message.timestamp).toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit',
           })}

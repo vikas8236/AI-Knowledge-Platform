@@ -1,11 +1,14 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from app.services.ai_service import get_ai_response
+from typing import List
+from datetime import datetime
+from sqlalchemy.orm import Session
 from app.core.deps import get_current_user
-from fastapi import Depends
+from app.core import crud
+from app.db.database import get_db
 
-class ConversationRequest(BaseModel):
-    title: str
+router = APIRouter()
+
 
 class ConversationResponse(BaseModel):
     id: int
@@ -13,21 +16,52 @@ class ConversationResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-router = APIRouter()
+    class Config:
+        from_attributes = True
 
-@router.post("/conversations", response_model=ConversationResponse)
-def create_conversation(request: ConversationRequest, current_user = Depends(get_current_user)):
-    return crud.create_conversation(request.title, current_user.id)
 
-@router.get("/conversations", response_model=List[ConversationResponse])
-def get_conversations(current_user = Depends(get_current_user)):
-    return crud.get_user_conversations(current_user.id)
+class MessageResponse(BaseModel):
+    id: int
+    role: str
+    content: str
+    created_at: datetime
 
-@router.get("/conversations/{conversation_id}/messages", response_model=List[MessageResponse])
-def get_conversation_messages(conversation_id: int, current_user = Depends(get_current_user)):
-    return crud.get_converstion_messages(conversation_id)
+    class Config:
+        from_attributes = True
 
-@router.delete("/conversations/{conversation_id}", response_model=ConversationResponse)
-def delete_conversation(conversation_id: int, current_user = Depends(get_current_user)):
-    return crud.delete_conversation(conversation_id)
 
+@router.get("/", response_model=List[ConversationResponse])
+def get_conversations(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return crud.get_user_conversations(db, current_user.id)
+
+
+@router.get("/{conversation_id}/messages", response_model=List[MessageResponse])
+def get_conversation_messages(
+    conversation_id: int,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    conversation = crud.get_conversation_by_id(db, conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if conversation.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your conversation")
+    return crud.get_conversation_messages(db, conversation_id)
+
+
+@router.delete("/{conversation_id}")
+def delete_conversation(
+    conversation_id: int,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    conversation = crud.get_conversation_by_id(db, conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if conversation.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your conversation")
+    crud.delete_conversation(db, conversation_id)
+    return {"message": "Conversation deleted"}
